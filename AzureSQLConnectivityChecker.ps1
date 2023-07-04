@@ -201,10 +201,10 @@ $SQLDB_Redirect = " Servers in SQL Database and Azure Synapse support Redirect, 
  Redirect (recommended): Clients establish connections directly to the node hosting the database, leading to reduced latency and improved throughput.
   For connections to use this mode, clients need to:
   - Allow outbound communication from the client to all Azure SQL IP addresses in the region on ports in the range of 11000-11999.
-  - Allow outbound communication from the client to Azure SQL Database gateway IP addresses on port 1433.
+  - Allow outbound communication from the client to Azure SQL Database gateway IP addresses on port 60010.
 
  Proxy: In this mode, all connections are proxied via the Azure SQL Database gateways, leading to increased latency and reduced throughput.
-  For connections to use this mode, clients need to allow outbound communication from the client to Azure SQL Database gateway IP addresses on port 1433.
+  For connections to use this mode, clients need to allow outbound communication from the client to Azure SQL Database gateway IP addresses on port 60010.
 
  If you are using Proxy, the Redirect Policy related tests would not be a problem.
  If you are using Redirect, failure to reach ports in the range of 11000-11999 is usually a client-side networking issue (like DNS issue or a port being blocked) that you will need to pursue with your local network administrator.
@@ -218,11 +218,11 @@ $SQLMI_GatewayTestFailed = " You can connect to SQL Managed Instance via private
  Failure to reach the Gateway is usually a client-side networking issue (like DNS issue or a port being blocked) that you will need to pursue with your local network administrator.
  We strongly recommend you request assistance from your network administrator, some validations you may do together are:
 
- - The host name is valid and port used for the connection is 1433, format is tcp:<mi_name>.<dns_zone>.database.windows.net,1433
+ - The host name is valid and port used for the connection is 60010, format is tcp:<mi_name>.<dns_zone>.database.windows.net,60010
 
- - The Network Security Groups (NSG) on the managed instance subnet allows access on port 1433.
+ - The Network Security Groups (NSG) on the managed instance subnet allows access on port 60010.
 
- - If you are unable to connect from an Azure hosted client (like an Azure virtual machine), check if you have a Network Security Group set on the client subnet that might be blocking *outbound* access on port 1433.
+ - If you are unable to connect from an Azure hosted client (like an Azure virtual machine), check if you have a Network Security Group set on the client subnet that might be blocking *outbound* access on port 60010.
 
  - If the connection type is Redirect:
     - Ensure the Network Security Groups (NSG) on the managed instance subnet allows access on ports **11000-11999**.
@@ -887,13 +887,13 @@ function RunSqlMIVNetConnectivityTests($resolvedAddress) {
         }
         Write-Host
         Write-Host 'Gateway connectivity tests (please wait):' -ForegroundColor Green
-        $testResult = Test-NetConnection $resolvedAddress -Port 1433 -WarningAction SilentlyContinue
+        $testResult = Test-NetConnection $resolvedAddress -Port 60010 -WarningAction SilentlyContinue
 
         if ($testResult.TcpTestSucceeded) {
             Write-Host ' -> TCP test succeed' -ForegroundColor Green
-            PrintAverageConnectionTime $resolvedAddress 1433
+            PrintAverageConnectionTime $resolvedAddress 60010
             TrackWarningAnonymously 'SQLMI|PrivateEndpoint|GatewayTestSucceeded'
-            RunConnectionToDatabaseTestsAndAdvancedTests $Server '1433' $Database $User $Password
+            RunConnectionToDatabaseTestsAndAdvancedTests $Server '60010' $Database $User $Password
             return $true
         }
         else {
@@ -906,14 +906,14 @@ function RunSqlMIVNetConnectivityTests($resolvedAddress) {
             }
             Write-Host
 
-            $msg = ' Gateway connectivity to ' + $resolvedAddress + ':1433 FAILED'
+            $msg = ' Gateway connectivity to ' + $resolvedAddress + ':60010 FAILED'
             Write-Host $msg -Foreground Red
             [void]$summaryLog.AppendLine()
             [void]$summaryLog.AppendLine($msg)
             [void]$summaryRecommendedAction.AppendLine()
             [void]$summaryRecommendedAction.AppendLine($msg)
 
-            $msg = ' Please fix the connectivity from this machine to ' + $resolvedAddress + ':1433'
+            $msg = ' Please fix the connectivity from this machine to ' + $resolvedAddress + ':60010'
             Write-Host $msg -Foreground Red
             [void]$summaryRecommendedAction.AppendLine($msg)
 
@@ -1011,7 +1011,7 @@ function RunSqlDBConnectivityTests($resolvedAddress) {
             TrackWarningAnonymously 'SQLDB|InvalidGatewayIPAddressWarning'
         }
 
-        RunConnectionToDatabaseTestsAndAdvancedTests $Server '1433' $Database $User $Password
+        RunConnectionToDatabaseTestsAndAdvancedTests $Server '60010' $Database $User $Password
     }
     else {
         if ($hasPrivateLinkAlias) {
@@ -1033,15 +1033,15 @@ function RunSqlDBConnectivityTests($resolvedAddress) {
         $hasGatewayTestSuccess = $false
         foreach ($gatewayAddress in $gateway.Gateways) {
             Write-Host
-            Write-Host ' Testing (gateway) connectivity to' $gatewayAddress':1433' -ForegroundColor White -NoNewline
-            $testResult = Test-NetConnection $gatewayAddress -Port 1433 -WarningAction SilentlyContinue
+            Write-Host ' Testing (gateway) connectivity to' $gatewayAddress':60010' -ForegroundColor White -NoNewline
+            $testResult = Test-NetConnection $gatewayAddress -Port 60010 -WarningAction SilentlyContinue
 
             if ($testResult.TcpTestSucceeded) {
                 $hasGatewayTestSuccess = $true
                 Write-Host ' -> TCP test succeed' -ForegroundColor Green
                 TrackWarningAnonymously ('SQLDB|GatewayTestSucceeded|' + $gatewayAddress)
-                PrintAverageConnectionTime $gatewayAddress 1433
-                $msg = ' Gateway connectivity to ' + $gatewayAddress + ':1433 succeed'
+                PrintAverageConnectionTime $gatewayAddress 60010
+                $msg = ' Gateway connectivity to ' + $gatewayAddress + ':60010 succeed'
                 [void]$summaryLog.AppendLine($msg)
             }
             else {
@@ -1057,13 +1057,13 @@ function RunSqlDBConnectivityTests($resolvedAddress) {
                     tracert -h 10 $Server
                 }
 
-                $msg = ' Gateway connectivity to ' + $gatewayAddress + ':1433 FAILED'
+                $msg = ' Gateway connectivity to ' + $gatewayAddress + ':60010 FAILED'
                 Write-Host $msg -Foreground Red
                 [void]$summaryLog.AppendLine($msg)
                 [void]$summaryRecommendedAction.AppendLine()
                 [void]$summaryRecommendedAction.AppendLine($msg)
 
-                $msg = ' Please make sure you fix the connectivity from this machine to ' + $gatewayAddress + ':1433 to avoid issues!'
+                $msg = ' Please make sure you fix the connectivity from this machine to ' + $gatewayAddress + ':60010 to avoid issues!'
                 Write-Host $msg -Foreground Red
                 [void]$summaryRecommendedAction.AppendLine($msg)
 
@@ -1154,7 +1154,7 @@ function RunSqlDBConnectivityTests($resolvedAddress) {
         }
 
         if ($hasGatewayTestSuccess -eq $true) {
-            RunConnectionToDatabaseTestsAndAdvancedTests $Server '1433' $Database $User $Password
+            RunConnectionToDatabaseTestsAndAdvancedTests $Server '60010' $Database $User $Password
         }
     }
 }
@@ -1476,8 +1476,8 @@ try {
             [void]$summaryLog.AppendLine($msg)
             [void]$summaryRecommendedAction.AppendLine($msg)
 
-            $msg = ' The private endpoint host name comes in the format <mi_name>.<dns_zone>.database.windows.net and the port used for the connection is 1433.
- Please specify port 1433 by setting Server parameter like: <mi_name>.<dns_zone>.database.windows.net,1433 (or do not specify any port number).
+            $msg = ' The private endpoint host name comes in the format <mi_name>.<dns_zone>.database.windows.net and the port used for the connection is 60010.
+ Please specify port 60010 by setting Server parameter like: <mi_name>.<dns_zone>.database.windows.net,60010 (or do not specify any port number).
  In case you are trying to use Public Endpoint, note that:
  - the public endpoint host name comes in the format <mi_name>.public.<dns_zone>.database.windows.net
  - the port used for the connection is 3342.'
@@ -1488,7 +1488,7 @@ try {
         }
 
         $Server = $Server.Replace('tcp:', '')
-        $Server = $Server.Replace(',1433', '')
+        $Server = $Server.Replace(',60010', '')
         $Server = $Server.Replace(',3342', '')
         $Server = $Server.Replace(';', '')
 
@@ -1557,7 +1557,7 @@ try {
             Write-Error '' -ErrorAction Stop
         }
         $resolvedAddress = $dnsResult.AddressList[0].IPAddressToString
-        $dbPort = 1433
+        $dbPort = 60010
 
         #Run connectivity tests
         Write-Host
